@@ -49,16 +49,16 @@
 %global PYTHON_VERSION 2.7
 %endif
 
-
-Name:          aurora
+Name:          aurora-scheduler
 Version:       %{AURORA_VERSION}
 Release:       1%{?dist}.aurora
-Summary:       A Mesos framework for scheduling and executing long-running services and cron jobs.
+Summary:       The Apache Aurora Scheduler
 Group:         Applications/System
 License:       ASL 2.0
 URL:           https://%{name}.apache.org/
 
-Source0:       https://github.com/apache/%{name}/archive/%{version}/%{name}.tar.gz
+#Source0:       https://github.com/apache/%{name}/archive/%{version}/aurora.tar.gz
+Source0:       aurora.tar.gz
 Source1:       aurora.service
 Source2:       thermos-observer.service
 Source3:       aurora.init.sh
@@ -100,14 +100,23 @@ Requires:      java-%{JAVA_VERSION}
 Requires:      mesos = %{MESOS_VERSION}
 
 
-%description
-Apache Aurora is a service scheduler that runs on top of Mesos, enabling you to schedule
-long-running services that take advantage of Mesos' scalability, fault-tolerance, and
-resource isolation.
+%description -n aurora-scheduler
+Apache Aurora lets you use an Apache Mesos cluster as a private cloud. It supports running
+long-running services, cron jobs, and ad-hoc jobs.
+
+Aurora aims to make it extremely quick and easy to take a built application and run it on
+machines in a cluster, with an emphasis on reliability. It provides basic operations to manage
+services running in a cluster, such as rolling upgrades.
+
+To very concisely describe Aurora, it is a system that you can instruct to do things like run
+100 of these, somewhere, forever.
+
+This package contains the Aurora scheduler. This package is typically installed on 3 to 5 nodes
+per Mesos cluster.
 
 
-%package client
-Summary: A client for scheduling services against the Aurora scheduler
+%package -n aurora-tools
+Summary: The Apache Aurora client and admin client tools
 Group: Development/Tools
 
 Requires: krb5-libs
@@ -117,13 +126,23 @@ Requires: python27
 Requires: python
 %endif
 
-%description client
-A set of command-line applications used for interacting with and administering Aurora
-schedulers.
+%description -n aurora-tools
+Apache Aurora lets you use an Apache Mesos cluster as a private cloud. It supports running
+long-running services, cron jobs, and ad-hoc jobs.
 
+Aurora aims to make it extremely quick and easy to take a built application and run it on
+machines in a cluster, with an emphasis on reliability. It provides basic operations to manage
+services running in a cluster, such as rolling upgrades.
 
-%package thermos
-Summary: Mesos executor that runs and monitors tasks scheduled by the Aurora scheduler
+To very concisely describe Aurora, it is a system that you can instruct to do things like run
+100 of these, somewhere, forever.
+
+This package includes the aurora and aurora-admin commandline tools for interacting with
+the Aurora scheduler. This package is typically installed on cluster user and administrator
+workstations.
+
+%package -n aurora-executor
+Summary: The Apache Aurora Executor and Observer components
 Group: Applications/System
 
 Requires: cyrus-sasl
@@ -140,15 +159,23 @@ Requires: python27
 Requires: python
 %endif
 
-%description thermos
-Thermos a simple process management framework used for orchestrating dependent processes
-within a single Mesos chroot.  It works in tandem with Aurora to ensure that tasks
-scheduled by it are properly executed on Mesos slaves and provides a Web UI to monitor the
-state of all running tasks.
+%description -n aurora-executor
+Apache Aurora lets you use an Apache Mesos cluster as a private cloud. It supports running
+long-running services, cron jobs, and ad-hoc jobs.
 
+Aurora aims to make it extremely quick and easy to take a built application and run it on
+machines in a cluster, with an emphasis on reliability. It provides basic operations to manage
+services running in a cluster, such as rolling upgrades.
+
+To very concisely describe Aurora, it is a system that you can instruct to do things like run
+100 of these, somewhere, forever.
+
+This package contains the components necessary to run Aurora jobs on a Mesos Agent node: the
+Aurora Executor and Observer. This package is typically installed on every Mesos Agent node
+in a cluster.
 
 %prep
-%setup -n apache-%{name}-%{version}
+%setup -n apache-aurora-%{version}
 
 
 %build
@@ -189,10 +216,10 @@ mv dist/kaurora_admin.pex dist/aurora_admin.pex
 ./pants binary src/main/python/apache/aurora/tools:thermos_observer
 ./pants binary src/main/python/apache/thermos/runner:thermos_runner
 
-# Packages the Thermos runner within the Thermos executor.
+# Packages the Thermos runner within the Thermos Executor.
 build-support/embed_runner_in_executor.py
 
-%install
+%install -n aurora-scheduler
 rm -rf $RPM_BUILD_ROOT
 
 # Builds installation directory structure.
@@ -239,7 +266,7 @@ install -m 644 %{SOURCE10} %{buildroot}%{_sysconfdir}/logrotate.d/thermos-observ
 install -m 644 %{SOURCE11} %{buildroot}%{_sysconfdir}/%{name}/clusters.json
 
 
-%pre
+%pre -n aurora-scheduler
 getent group %{AURORA_GROUP} > /dev/null || groupadd -r %{AURORA_GROUP}
 getent passwd %{AURORA_USER} > /dev/null || \
     useradd -r -d %{_localstatedir}/lib/%{name} -g %{AURORA_GROUP} \
@@ -247,14 +274,14 @@ getent passwd %{AURORA_USER} > /dev/null || \
 exit 0
 
 # Pre/post installation scripts:
-%post
+%post -n aurora-scheduler
 %if 0%{?fedora} || 0%{?rhel} > 6
 %systemd_post %{name}.service
 %else
 /sbin/chkconfig --add %{name}
 %endif
 
-%preun
+%preun -n aurora-scheduler
 %if 0%{?fedora} || 0%{?rhel} > 6
 %systemd_preun %{name}.service
 %else
@@ -262,7 +289,7 @@ exit 0
 /sbin/chkconfig --del %{name}
 %endif
 
-%postun
+%postun -n aurora-scheduler
 %if 0%{?fedora} || 0%{?rhel} > 6
 %systemd_postun_with_restart %{name}.service
 %else
@@ -270,14 +297,14 @@ exit 0
 %endif
 
 
-%post thermos
+%post -n aurora-executor
 %if 0%{?fedora} || 0%{?rhel} > 6
 %systemd_post thermos-observer.service
 %else
 /sbin/chkconfig --add thermos-observer
 %endif
 
-%preun thermos
+%preun -n aurora-executor
 %if 0%{?fedora} || 0%{?rhel} > 6
 %systemd_preun thermos-observer.service
 %else
@@ -285,7 +312,7 @@ exit 0
 /sbin/chkconfig --del thermos-observer
 %endif
 
-%postun thermos
+%postun -n aurora-executor
 %if 0%{?fedora} || 0%{?rhel} > 6
 %systemd_postun_with_restart thermos-observer.service
 %else
@@ -293,7 +320,7 @@ exit 0
 %endif
 
 
-%files
+%files -n aurora-scheduler
 %defattr(-,root,root,-)
 %doc docs/*.md
 %{_bindir}/aurora-scheduler-startup
@@ -311,14 +338,14 @@ exit 0
 %config(noreplace) %{_sysconfdir}/sysconfig/%{name}
 
 
-%files client
+%files -n aurora-tools
 %defattr(-,root,root,-)
 %{_bindir}/%{name}
 %{_bindir}/%{name}_admin
 %config(noreplace) %{_sysconfdir}/%{name}/clusters.json
 
 
-%files thermos
+%files -n aurora-executor
 %defattr(-,root,root,-)
 %{_bindir}/thermos
 %{_bindir}/thermos_executor
